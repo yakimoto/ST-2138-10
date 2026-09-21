@@ -99,7 +99,7 @@ with Table 3, so the name and the record cannot drift apart:
 
 | Key | Required? | Description | Example |
 |---|---|---|---|
-| api | No | The API the instance offers; one of `grpc`, `rest`, `ws`. Mirrors the advertised subtype. | `api=grpc` |
+| api | No | The APIs the instance offers; one or more of `grpc`, `rest`, `ws`, comma-separated when several. Mirrors the advertised subtypes. | `api=grpc,rest` |
 | transport | No | The transport beneath the API; one of `http2s`, `http2`, `https`, `http`, `quic`. | `transport=http2s` |
 
 ## 4. Clause 7.5 — replace the Avahi example
@@ -123,7 +123,7 @@ instance, one type, two subtype attestations:
         <txt-record>authz=off</txt-record>
         <txt-record>interface=https://smpte.org/registry/st2138/service</txt-record>
         <txt-record>if_version=2025.1</txt-record>
-        <txt-record>api=grpc</txt-record>
+        <txt-record>api=grpc,rest</txt-record>
         <txt-record>transport=http2s</txt-record>
         <txt-record>sdk=https://github.com/rossvideo/Catena</txt-record>
         <txt-record>sdk_version=cpp-v0.0.7-1</txt-record>
