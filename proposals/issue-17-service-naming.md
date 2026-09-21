@@ -27,30 +27,38 @@ PROPOSED:
 > Where:
 > - `<instance-name>` is a human-readable identifier for the service instance
 > - `_st2138` identifies the control protocol as SMPTE ST 2138
-> - `<network>` specifies the network layer which shall be one of these
->   values:
+> - `<network>` specifies the transport protocol per RFC 6763 section 7,
+>   which shall be one of these values:
 >   - `_tcp`
 >   - `_udp`, for instances using `quic` (see Table 2, `transport`)
 >
 > The two-label service type keeps every ST 2138 instance discoverable with
-> stock DNS-SD tooling: a browse for `_st2138._tcp` (or `_st2138._udp`)
-> enumerates all instances on the link, as RFC 6763 section 4.1.2 requires.
+> stock DNS-SD tooling: a browse for `_st2138._tcp` enumerates all TCP-based
+> instances and a browse for `_st2138._udp` all others, per RFC 6763
+> section 7.
 >
 > API and transport narrowing, previously encoded as extra name labels, shall
 > use RFC 6763 section 7.1 subtypes. An instance offering an API shall
 > advertise the corresponding subtype:
 >
 > | API offered | subtype advertised |
-> |---|---|---|
+> |---|---|
 > | gRPC | `_grpc._sub._st2138._tcp` |
 > | REST | `_rest._sub._st2138._tcp` |
 > | WebSocket | `_ws._sub._st2138._tcp` |
 >
+> QUIC instances live under `_st2138._udp` and advertise no API subtype;
+> their API and transport are carried by the Table 2 keys alone. (If the
+> committee wants filtered QUIC discovery, `_grpc._sub._st2138._udp` rows
+> can be added here — left out deliberately, not overlooked.)
+>
 > A client discovering only a subset (for example, gRPC endpoints) browses
 > the subtype; a client discovering everything browses `_st2138._tcp`. The
 > advertised Service Instance Name is unchanged by the use of subtypes. TLS
-> posture (`http2s` vs `http2`, `https` vs `http`) and QUIC adoption state
-> are expressed with the Table 2 `transport` key, not with name labels.
+> posture (`http2s` vs `http2`, `https` vs `http`) is expressed with the
+> Table 2 `transport` key, not with name labels — which means a subtype
+> browse alone cannot distinguish TLS variants; see the Table 2 pairing
+> rule below.
 >
 > Naming Requirements (unchanged):
 > - The instance name shall be unique on the local network.
@@ -86,6 +94,25 @@ same port semantics, conformant names):
 >   For example:
 >
 >   `router._st2138._tcp.local. SRV 0 0 <port> <hostname>.local.`
+>
+>   Where `<port>` is the TCP or UDP port number on which the service is
+>   available.
+>
+> - Subtype PTR records
+>
+>   For each API subtype the instance advertises under section 7.4.1, it
+>   shall also publish a PTR record from the subtype name to the same
+>   Service Instance Name, so filtered browsing resolves. For example:
+>
+>   `_grpc._sub._st2138._tcp.local. PTR router._st2138._tcp.local.`
+>
+>   Without these records the section 7.4.1 advertisement requirement has
+>   no record backing it.
+>
+> - A/AAAA records address `<hostname>.local.`, not `<instance-name>.local.:
+>   the SRV target is the hostname, and the address records shall follow it.
+>   (The draft's A/AAAA owner names use the instance name; corrected here
+>   because the SRV record above points at the hostname.)
 
 TXT record paragraph: replace
 `<instance-name>._st2138.<api>.<transport>.<network>.local. TXT <key>=<value>`
@@ -99,8 +126,14 @@ with Table 3, so the name and the record cannot drift apart:
 
 | Key | Required? | Description | Example |
 |---|---|---|---|
-| api | No | The APIs the instance offers; one or more of `grpc`, `rest`, `ws`, comma-separated when several. Mirrors the advertised subtypes. | `api=grpc,rest` |
-| transport | No | The transport beneath the API; one of `http2s`, `http2`, `https`, `http`, `quic`. | `transport=http2s` |
+| api | Yes | The APIs the instance offers, one or more of `grpc`, `rest`, `ws`, comma-separated when several. The set shall equal the set of subtypes advertised under section 7.4.1. | `api=grpc,rest` |
+| transport | Yes | The transports beneath the offered APIs, one or more of `http2s`, `http2`, `https`, `http`, `quic`, comma-separated and positionally aligned with `api` (first transport belongs to the first API, and so on). The permitted pairings are: gRPC with `http2s`, `http2` or `quic`; REST and WebSocket with `https` or `http`. | `transport=http2s,http` |
+
+The positional rule is the whole point: without it `api=grpc,rest` with
+`transport=http` cannot say which API the transport belongs to, and the
+draft's own pairing (gRPC never on plain `http`, REST never on `http2s`)
+would become expressible-but-wrong. A single `transport` value with several
+APIs is permitted only when it applies to all of them.
 
 ## 4. Clause 7.5 — replace the Avahi example
 
@@ -113,8 +146,9 @@ instance, one type, two subtype attestations:
 <service-group>
     <name replace-wildcards="yes">router</name>
 
-    <!-- ST 2138, both APIs on one instance; browsers see _st2138._tcp,
-         filtered browsers see _grpc._sub or _rest._sub -->
+    <!-- ST 2138, secure gRPC plus clear-text REST on one instance.
+         Browsers see _st2138._tcp; filtered browsers see _grpc._sub or
+         _rest._sub. Transports align positionally with api (7.4.1). -->
     <service>
         <type>_st2138._tcp</type>
         <subtype>_grpc._sub._st2138._tcp</subtype>
@@ -124,27 +158,33 @@ instance, one type, two subtype attestations:
         <txt-record>interface=https://smpte.org/registry/st2138/service</txt-record>
         <txt-record>if_version=2025.1</txt-record>
         <txt-record>api=grpc,rest</txt-record>
-        <txt-record>transport=http2s</txt-record>
+        <txt-record>transport=http2s,http</txt-record>
         <txt-record>sdk=https://github.com/rossvideo/Catena</txt-record>
         <txt-record>sdk_version=cpp-v0.0.7-1</txt-record>
+        <txt-record>content-type=application/json</txt-record>
     </service>
 
 </service-group>
 ```
 
-(Note: the current draft's two `<service>` blocks imply two ports
-(6254/8080) for one instance; the replacement keeps a single service entry.
-If dual-port operation is intended, that needs its own instance naming rule,
-which is out of scope for this issue.)
+(Note: the current draft serves gRPC on 6254 and REST on 8080 under one
+instance name, which DNS-SD cannot express — one SRV port per instance. The
+replacement keeps a single service entry; if dual-port operation is
+intended, that needs its own instance naming rule, which is out of scope
+for this issue. `content-type=application/json` is restored: it was dropped
+without a note and belongs to the REST leg.)
 
 ## 5. Table 3 — correct the value sets
 
-- `api`: add `ws` (the draft's own 7.4.1 lists `_ws` as an API value, but
-  Table 3 admits only `gRPC, REST`).
+- `api`: one or more of `grpc`, `rest`, `ws`, comma-separated, matching
+  Table 2 case and vocabulary exactly (the draft's `gRPC, REST` display case
+  would reintroduce the drift Table 2 exists to prevent). Update the 7.9
+  example from `"api": "gRPC"` to `"api": "grpc"`.
 - `transport`: correct `qui` to `quic`.
 
 No other Table 3 change. `service-name`, `hostname`, `port`, address,
-authorization, and metadata rows are untouched.
+authorization, and metadata rows are untouched. 7.9 changes only in the
+`api` value quoted above.
 
 ---
 
@@ -155,9 +195,12 @@ authorization, and metadata rows are untouched.
   worked example; instance names unchanged by subtypes.
 - RFC 6335: IANA registration noted as editor action, not mandated.
 - Table 3 `api`/`transport` values are now a subset of the Table 2 key
-  vocabularies — no drift between name, TXT, and registration payload.
+  vocabularies, case included — no drift between name, TXT, registration
+  payload, and the 7.9 example.
 - Instance-name uniqueness rule and hostname guidance carried over verbatim.
-- No clause outside 7.4.1, 7.4.2, Table 2, 7.5, and Table 3 is touched.
+- Touched: 7.4.1, 7.4.2 (including A/AAAA owner names), Table 2, 7.5
+  (including its intro, which now describes one instance instead of two
+  ports), Table 3, and the 7.9 `api` value. Nothing else.
 
 ## Verification appendix (primary sources, 2026-09-20)
 
