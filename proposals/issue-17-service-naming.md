@@ -56,9 +56,10 @@ PROPOSED:
 > - The instance name shall be unique on the local network.
 > - Implementations may include the hostname or another unique identifier.
 
-NOTE (non-normative, for the editors): the Service Name `st2138` should be
-registered in the IANA Service Name registry per RFC 6335; stock resolvers
-consult that registry when validating the first label.
+NOTE (non-normative, for the editors): the Service Name `st2138` is not
+present in the IANA registry that RFC 6763 section 4.1.2 reaches via
+RFC 6335. Registering it is a process action accompanying this change, not
+a protocol behavior — stated here so it is not lost.
 
 ## 2. Clause 7.4.2 — replace the record examples
 
@@ -157,3 +158,17 @@ authorization, and metadata rows are untouched.
   vocabularies — no drift between name, TXT, and registration payload.
 - Instance-name uniqueness rule and hostname guidance carried over verbatim.
 - No clause outside 7.4.1, 7.4.2, Table 2, 7.5, and Table 3 is touched.
+
+## Verification appendix (primary sources, 2026-09-20)
+
+- RFC 6763 §4.1.2 pair rule + §7.1 subtype mechanics verified verbatim
+  against rfc-editor.org rfc6763.txt (not from memory).
+- Avahi `<subtype>` (repeatable child of `<service>`) verified against the
+  authoritative DTD (`avahi-daemon/avahi-service.dtd`,
+  `<!ELEMENT service (type,subtype*,...)>`), so the 7.5 example's two
+  subtype elements are schema-valid.
+- Draft text extracted from the repo PDF (34 pp); every `_st2138._x._y`
+  occurrence located — all live in 7.4.2/7.5, both covered. Table 3 `qui`
+  typo and missing `ws` confirmed against extracted text.
+- One correction made during audit: an early draft claimed resolvers
+  consult the IANA registry; reworded to the process action it is.
