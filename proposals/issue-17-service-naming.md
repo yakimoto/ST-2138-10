@@ -38,8 +38,8 @@ PROPOSED:
 > section 7.
 >
 > API and transport narrowing, previously encoded as extra name labels, shall
-> use RFC 6763 section 7.1 subtypes. An instance offering an API shall
-> advertise the corresponding subtype:
+> use RFC 6763 section 7.1 subtypes. An instance offering an API over TCP
+> shall advertise the corresponding subtype:
 >
 > | API offered | subtype advertised |
 > |---|---|
@@ -47,8 +47,8 @@ PROPOSED:
 > | REST | `_rest._sub._st2138._tcp` |
 > | WebSocket | `_ws._sub._st2138._tcp` |
 >
-> QUIC instances live under `_st2138._udp` and advertise no API subtype;
-> their API and transport are carried by the Table 2 keys alone. (If the
+> QUIC instances live under `_st2138._udp` and advertise no subtype; their
+> API and transport are carried by the Table 2 keys alone. (If the
 > committee wants filtered QUIC discovery, `_grpc._sub._st2138._udp` rows
 > can be added here — left out deliberately, not overlooked.)
 >
@@ -109,7 +109,7 @@ same port semantics, conformant names):
 >   Without these records the section 7.4.1 advertisement requirement has
 >   no record backing it.
 >
-> - A/AAAA records address `<hostname>.local.`, not `<instance-name>.local.:
+> - A/AAAA records address `<hostname>.local.`, not `<instance-name>.local.`:
 >   the SRV target is the hostname, and the address records shall follow it.
 >   (The draft's A/AAAA owner names use the instance name; corrected here
 >   because the SRV record above points at the hostname.)
@@ -126,14 +126,14 @@ with Table 3, so the name and the record cannot drift apart:
 
 | Key | Required? | Description | Example |
 |---|---|---|---|
-| api | Yes | The APIs the instance offers, one or more of `grpc`, `rest`, `ws`, comma-separated when several. The set shall equal the set of subtypes advertised under section 7.4.1. | `api=grpc,rest` |
+| api | Yes | The APIs the instance offers, one or more of `grpc`, `rest`, `ws`, comma-separated when several. The set shall equal the set of subtypes advertised under section 7.4.1; QUIC instances, which advertise no subtypes, list the APIs offered. | `api=grpc,rest` |
 | transport | Yes | The transports beneath the offered APIs, one or more of `http2s`, `http2`, `https`, `http`, `quic`, comma-separated and positionally aligned with `api` (first transport belongs to the first API, and so on). The permitted pairings are: gRPC with `http2s`, `http2` or `quic`; REST and WebSocket with `https` or `http`. | `transport=http2s,http` |
 
 The positional rule is the whole point: without it `api=grpc,rest` with
 `transport=http` cannot say which API the transport belongs to, and the
 draft's own pairing (gRPC never on plain `http`, REST never on `http2s`)
-would become expressible-but-wrong. A single `transport` value with several
-APIs is permitted only when it applies to all of them.
+would become expressible-but-wrong. No exceptions: a single transport
+value with several APIs is not permitted — repeat it per API.
 
 ## 4. Clause 7.5 — replace the Avahi example
 
